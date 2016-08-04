@@ -36,11 +36,11 @@ function BVP_linear(p::Function, q::Function, f::Function,
         F[N+1] = c₁
 
         for j in i
-            p_i = p(x[i]) / h₂
-            A[i+1] = h² - p_i
-            B[i+1] = h² + p_i
-            C[i+1] = -(2*h² - q(x[i]))
-            F[i+1] = f(x[i])
+            p_i = p(x[j]) / h₂
+            A[j+1] = h² - p_i
+            B[j+1] = h² + p_i
+            C[j+1] = -(2*h² - q(x[j]))
+            F[j+1] = f(x[j])
         end
 
         if B[1] != 0
