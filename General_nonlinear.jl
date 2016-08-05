@@ -6,10 +6,10 @@ function BVP_nonlinear(f::Function, a::Number,  b::Number,
                        a₀::Number,  b₀::Number, c₀::Number,
                        a₁::Number,  b₁::Number, c₁::Number;
                        N=Int((b-a)*20),         y=0,
-                       tol = 1e-3)
-    if y==0
-        y=randn(N+1)
-    end
+                       tol = 1e-3,  maxIt=1e4)
+    # if y==0
+    #     y=randn(N+1)
+    # end
     # N = 50
     # a = 0.0
     # b = 10.0
@@ -44,7 +44,8 @@ function BVP_nonlinear(f::Function, a::Number,  b::Number,
     F[N+1] = c₁
 
     for j in i
-        A[i+1] = B[i+1] = h²
+        A[i+1] = h²
+        B[i+1] = h²
         C[i+1] = -2*h²
     end
 
@@ -55,46 +56,51 @@ function BVP_nonlinear(f::Function, a::Number,  b::Number,
     y_n = y
     y_n1 = similar(y_n)
     updateF!(F, f, x, y_n, N, h)
+    k = 0
 
-    for i in 1:10
-        J = compJ(f, x, y_n, h, N+1)
+    while norm(JG) >= tol
+        J = compJ(f, x, y_n, h, N+1, M)
         G = M*y_n - F
-        @show size(J)
-        y_n1 = J \ -G + y_n
+        JG = J \ -G
+        y_n1 = JG + y_n
         updateF!(F, f, x, y_n1, N, h)
         y_n = y_n1
+            k+=1
+        if k > maxIt
+            println("Max iterations reached")
+            break
+        end
     end
     return y_n1
 end
 
 function myBessel(x, y, yp)
-    ( -x*yp - (x^2-α) ) / x^2
+    - ( x*yp - (x^2-α^2)*y ) / x^2
 end
 
 function updateF!(F::Vector, f::Function, x::LinSpace, y::Vector, N::Int, h::Number)
-    for i = 2:N - 1
+    for i = 2:N
         F[i] = f(x[i], y[i], (y[i+1] - y[i-1])/(2h))
     end
     return F
 end
 
-function compJ(f::Function, x::LinSpace, y::Vector, h::Number, N::Number)
+function compJ(f::Function, x::LinSpace, y::Vector, h::Number, N::Number, M::Tridiagonal)
     J = Tridiagonal(zeros(N - 1), zeros(N), zeros(N - 1))
     ff(xys) = f(xys[1],xys[2],(xys[3]-xys[4])/(2h))
-    ff_1_N(xys) = f(xys[1],xys[2],(xys[3]-xys[4])/h)
-    @show x
-    @show y
-    @show g = ForwardDiff.gradient(ff_1_N)([x[1],y[1],y[2],y[1]])
-    J.d[1]  = g[1]
-    J.dl[1] = g[3]
-    J.du[1] = g[4]
-    @show g = ForwardDiff.gradient(ff_1_N)([x[N],y[N],y[N],y[N-1]])
-    J.d[N]  = g[1]
+    ff_1_N(xys) = f(xys[1],xys[2],(xys[3]-xys[2])/h)
+    g = ForwardDiff.gradient(ff_1_N)([x[1],y[1],y[2]])
+    J.d[1]  = M.d[1] - g[2]
+    #J.dl[1] = g[3]
+    J.du[1] = M.du[1] - g[3]
+    g = ForwardDiff.gradient(ff_1_N)([x[N],y[N],y[N-1]])
+    J.d[N]  = M.d[N] - g[2]
+    J.dl[N-1] = M.dl[N-1] - g[3]
     for i = 2:N-1
         g = ForwardDiff.gradient(ff)([x[i],y[i],y[i+1],y[i-1]])
-        J.d[i] = g[1]
-        J.dl[i] = g[3]
-        J.du[i] = g[4]
+        J.d[i] = M.d[i] - g[2]
+        J.dl[i-1] = M.dl[i-1] - g[3]
+        J.du[i] = M.du[i] - g[4]
     end
     J
 end
