@@ -5,14 +5,16 @@ using ForwardDiff
 function BVP_nonlinear(f::Function, a::Number,  b::Number,
                        a₀::Number,  b₀::Number, c₀::Number,
                        a₁::Number,  b₁::Number, c₁::Number;
-                       N=Int((b-a)*20),
+                       N=Int((b-a)*20),         y=0,
                        tol = 1e-3)
-    y=randn(N+1)
+    if y==0
+        y=randn(N+1)
+    end
     # N = 50
     # a = 0.0
     # b = 10.0
     i = 1:N-1
-    x = linspace(a, b, N)
+    x = linspace(a, b, N+1)
     h = (b-a) / N
 
     # a₀ = 1.
@@ -51,20 +53,18 @@ function BVP_nonlinear(f::Function, a::Number,  b::Number,
                     [C[1], B[2:N];]
                     )
     y_n = y
+    y_n1 = similar(y_n)
     updateF!(F, f, x, y_n, N, h)
 
-    for i in x
-        J = compJ(f, x, y_n)
+    for i in 1:10
+        J = compJ(f, x, y_n, h, N+1)
         G = M*y_n - F
-        @show size(J\-G)
-        @show size(y_n*transpose(y_n))
-        #@show size(G)
-        #@show size(J * y_n * transpose(y_n))
-        y_n1 = (J * y_n) \ (J * y_n * transpose(y_n) - G)
-        updateF!(F, f, x, y_n1)
+        @show size(J)
+        y_n1 = J \ -G + y_n
+        updateF!(F, f, x, y_n1, N, h)
         y_n = y_n1
     end
-    return yn_1
+    return y_n1
 end
 
 function myBessel(x, y, yp)
@@ -78,13 +78,21 @@ function updateF!(F::Vector, f::Function, x::LinSpace, y::Vector, N::Int, h::Num
     return F
 end
 
-function compJ(f::Function, x, y::Vector)
-    N = length(y)
+function compJ(f::Function, x::LinSpace, y::Vector, h::Number, N::Number)
     J = Tridiagonal(zeros(N - 1), zeros(N), zeros(N - 1))
     ff(xys) = f(xys[1],xys[2],(xys[3]-xys[4])/(2h))
-    for i = 2:N - 1
-        g = ForwardDiff.gradient(ff)([x[i],y[i],y[i-1],y[i+1]])
-        J.d[i] = g[2]
+    ff_1_N(xys) = f(xys[1],xys[2],(xys[3]-xys[4])/h)
+    @show x
+    @show y
+    @show g = ForwardDiff.gradient(ff_1_N)([x[1],y[1],y[2],y[1]])
+    J.d[1]  = g[1]
+    J.dl[1] = g[3]
+    J.du[1] = g[4]
+    @show g = ForwardDiff.gradient(ff_1_N)([x[N],y[N],y[N],y[N-1]])
+    J.d[N]  = g[1]
+    for i = 2:N-1
+        g = ForwardDiff.gradient(ff)([x[i],y[i],y[i+1],y[i-1]])
+        J.d[i] = g[1]
         J.dl[i] = g[3]
         J.du[i] = g[4]
     end
