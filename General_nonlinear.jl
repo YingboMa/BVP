@@ -6,7 +6,7 @@ function BVP_nonlinear(f::Function, a::Number,  b::Number,
                        a₀::Number,  b₀::Number, c₀::Number,
                        a₁::Number,  b₁::Number, c₁::Number;
                        N=Int((b-a)*15),         y=0,
-                       tol = 1e-1,  maxIt=1e3)
+                       tol = 1e-3,  maxIt=Int(1e3))
     i = 1:N-1
     h = (b-a) / N
     x = [a:h:b;]
@@ -62,15 +62,8 @@ function BVP_nonlinear(f::Function, a::Number,  b::Number,
             warn("Max iterations reached")
             break
         end
+    end
     return y_n1
-end
-
-function myBessel(x, y, yp)
-    - ( x*yp - (x^2-α^2)*y ) / x^2
-end
-
-function foo(x,y,yp)
-    sin(yp)
 end
 
 function updateF!(F::Vector, f::Function, x::Vector, y::Vector, N::Int, h::Number)
