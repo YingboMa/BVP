@@ -11,8 +11,8 @@ function BVP_linear(p::Function, q::Function, f::Function,
                     )
 
     if (a₀*b₁-a₁*b₀)+a₀*a₁*(b-a) == 0
-        println("This system is not unique!")
-    else
+        warn("This system is not unique!")
+    end
         i = 1:N-1
         x = linspace(a, b, N)
         h = (b-a) / N
@@ -67,6 +67,5 @@ function BVP_linear(p::Function, q::Function, f::Function,
                         )
 
         Y = M\F
-        return linspace(a, b, N+1), Y
-    end
+        return linspace(a, b, N+1), Y, M, F
 end

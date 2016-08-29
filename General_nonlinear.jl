@@ -48,9 +48,9 @@ function BVP_nonlinear(f::Function, a::Number,  b::Number,
     updateF!(F, f, x, y_n, N, h)
     JG = 1.
     k = 0
-
+    J = Tridiagonal(zeros(N), zeros(N+1), zeros(N))
     while norm(JG) >= tol
-        J = compJ(f, x, y_n, h, N+1, M)
+        compJ!(J, f, x, y_n, h, N, M)
         G = M*y_n - F
         JG = J \ -G
         y_n1 = JG + y_n
@@ -63,7 +63,7 @@ function BVP_nonlinear(f::Function, a::Number,  b::Number,
             break
         end
     end
-    return y_n1
+    return linspace(a, b, N+1), y_n1, J
 end
 
 function updateF!(F::Vector, f::Function, x::Vector, y::Vector, N::Int, h::Number)
@@ -73,15 +73,15 @@ function updateF!(F::Vector, f::Function, x::Vector, y::Vector, N::Int, h::Numbe
     return F
 end
 
-function compJ(f::Function, x::Vector, y::Vector, h::Number, N::Number, M::Tridiagonal)
-    J = Tridiagonal(zeros(N - 1), zeros(N), zeros(N - 1))
+function compJ!(J::Tridiagonal, f::Function, x::Vector, y::Vector, h::Number, N::Number, M::Tridiagonal)
     ff(xys) = f(xys[1],xys[2],(xys[3]-xys[4])/(2h))
     J.d[1]  = M.d[1]
+    J.d[N+1]= M.d[N+1]
     J.du[1] = M.du[1]
-    J.d[N]  = M.d[N]
-    J.dl[N-1] = M.dl[N-1]
-    for i = 2:N-1
-        g = ForwardDiff.gradient(ff)([x[i],y[i],y[i+1],y[i-1]])
+    J.dl[N] = M.dl[N]
+    gg = t -> ForwardDiff.gradient(ff, t, Chunk{4}())
+    for i = 2:N
+        g = gg([x[i],y[i],y[i+1],y[i-1]])
         J.d[i] = M.d[i] - g[2]
         J.dl[i-1] = M.dl[i-1] - g[3]
         J.du[i] = M.du[i] - g[4]
